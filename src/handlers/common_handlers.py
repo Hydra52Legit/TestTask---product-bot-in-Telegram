@@ -1,24 +1,23 @@
-from aiogram import Router, F
+from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import Message
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.keyboards.common_keyboards import get_main_keyboard
 from src.database.models import User
+from src.keyboards.common_keyboards import get_main_keyboard
 
 router = Router()
 
 
 @router.message(Command("start"))
-async def cmd_start(message: Message, session: AsyncSession):
+async def cmd_start(message: Message, session: AsyncSession, user: User | None = None):
     """Обработка команды /start"""
-    user_id = message.from_user.id
-
-    # Получаем пользователя из сессии (уже зарегистрирован через middleware)
-    from sqlalchemy import select
-    stmt = select(User).where(User.telegram_id == user_id)
-    result = await session.execute(stmt)
-    user = result.scalar_one()
+    current_user = user
+    if current_user is None:
+        stmt = select(User).where(User.telegram_id == message.from_user.id)
+        result = await session.execute(stmt)
+        current_user = result.scalar_one_or_none()
 
     welcome_text = (
         "👋 Добро пожаловать в магазин карточек!\n\n"
@@ -31,7 +30,7 @@ async def cmd_start(message: Message, session: AsyncSession):
 
     await message.answer(
         welcome_text,
-        reply_markup=get_main_keyboard(user.is_admin)
+        reply_markup=get_main_keyboard(current_user.is_admin if current_user else False),
     )
 
 

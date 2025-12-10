@@ -3,6 +3,8 @@ sqlalchemy[asyncio]==2.0.45
 asyncpg==0.31.0
 alembic==1.16.5
 python-dotenv==1.2.1
+pydantic-settings==2.6.1
+aiosqlite==0.20.0
 pytest==8.4.2
 pytest-asyncio==1.2.0
 pytest-cov==7.0.0
