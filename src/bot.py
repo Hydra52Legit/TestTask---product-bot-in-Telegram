@@ -12,6 +12,7 @@ from src.database.models import Base
 from src.middlewares.config_middleware import ConfigMiddleware
 from src.middlewares.db_middleware import DatabaseMiddleware
 from src.middlewares.user_middleware import UserMiddleware
+from src.services.user_service import UserService
 from src.utils.logger import setup_logger
 
 # Импортируем все handlers
@@ -36,6 +37,11 @@ async def main():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     logger.info("База данных инициализирована")
+
+    # Синхронизируем флаги админов с конфигом
+    async with async_session() as session:
+        await UserService.sync_admin_flags(session, config.admin_ids_list)
+    logger.info("Админы синхронизированы: %s", config.admin_ids_list)
 
     bot = Bot(token=config.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     storage = MemoryStorage()

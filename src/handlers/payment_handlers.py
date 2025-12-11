@@ -21,19 +21,37 @@ async def _get_card(session: AsyncSession, card_id: int) -> Optional[Card]:
 
 
 @router.callback_query(F.data.startswith("buy_"))
-async def handle_buy(callback: CallbackQuery, session: AsyncSession, config: Config, user: User):
-    """Запрос на покупку карточки: отправляем инвойс."""
+async def handle_buy(callback: CallbackQuery, session: AsyncSession, config: Config, user: Optional[User] = None):
+    # Извлечение ID карточки из данных callback
     card_id = int(callback.data.split("_")[1])
+
+    # Не переопределяем user, извлекаем его из базы данных
+    if user is None:
+        user_id = callback.from_user.id
+        stmt = select(User).where(
+            User.telegram_id == user_id,
+            User.is_admin == True
+        )
+        result = await session.execute(stmt)
+        user = result.scalar_one_or_none()  # Получаем объект User
+
+        if user is None:
+            await callback.answer("Пользователь не найден.")
+            return
+
+    # Получаем карточку
     card = await _get_card(session, card_id)
     if not card:
         await callback.answer("Карточка недоступна")
         return
 
+    # Проверяем наличие токена для оплаты
     if not config.payment_provider_token:
         await callback.answer("Оплата временно недоступна")
         logger.warning("Payment provider token is not configured")
         return
 
+    # Создаем инвойс
     purchase = await PaymentService.create_invoice(
         session=session, user_id=user.id, card_id=card.id, amount=card.price
     )
@@ -49,6 +67,7 @@ async def handle_buy(callback: CallbackQuery, session: AsyncSession, config: Con
         payload=purchase.invoice_id,
     )
     await callback.answer("Счет выставлен")
+
 
 
 @router.pre_checkout_query()

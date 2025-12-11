@@ -1,6 +1,9 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.utils.keyboard import ReplyKeyboardBuilder
+
 
 def get_cards_keyboard(
         current_index: int,
@@ -43,3 +46,9 @@ def get_buy_confirmation_keyboard(card_id: int) -> InlineKeyboardMarkup:
         callback_data="cancel_buy"
     ))
     return builder.as_markup()
+
+def get_card_creation_cancel_keyboard() -> ReplyKeyboardMarkup:
+    """Клавиатура для отмены создания карточки"""
+    builder = ReplyKeyboardBuilder()
+    builder.add(KeyboardButton(text="❌ Отмена"))
+    return builder.as_markup(resize_keyboard=True)

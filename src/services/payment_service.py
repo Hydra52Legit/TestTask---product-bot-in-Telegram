@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime
 
@@ -6,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.database.models import Card, Purchase, User
+
+logger = logging.getLogger(__name__)
 
 
 class PaymentService:
@@ -27,6 +30,7 @@ class PaymentService:
         session.add(purchase)
         await session.commit()
         await session.refresh(purchase)
+        logger.info("Создан инвойс %s на сумму %.2f для карточки %s", invoice_id, amount, card_id)
         return purchase
 
     @staticmethod
@@ -38,18 +42,22 @@ class PaymentService:
         )
         purchase = (await session.execute(stmt)).scalar_one_or_none()
         if not purchase:
+            logger.error("Инвойс %s не найден или уже оплачен", invoice_id)
             return False
 
         card = purchase.card
         if not card:
+            logger.error("Для инвойса %s не найдена карточка", invoice_id)
             return False
 
         seller_stmt = select(User).where(User.id == card.user_id)
         seller = (await session.execute(seller_stmt)).scalar_one_or_none()
         if not seller:
+            logger.error("Для инвойса %s не найден продавец", invoice_id)
             return False
 
         seller.balance += purchase.amount
         purchase.is_paid = True
         await session.commit()
+        logger.info("Платеж по инвойсу %s успешно обработан, баланс продавца обновлен", invoice_id)
         return True

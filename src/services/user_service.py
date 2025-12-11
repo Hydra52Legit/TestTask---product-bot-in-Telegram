@@ -1,9 +1,13 @@
+import logging
 from typing import List, Optional
 
 from sqlalchemy import func, select, update
+from sqlalchemy import Integer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import Card, User, WithdrawalRequest
+
+logger = logging.getLogger(__name__)
 
 
 class UserService:
@@ -34,12 +38,14 @@ class UserService:
             session.add(user)
             await session.commit()
             await session.refresh(user)
+            logger.info("Создан пользователь %s (admin=%s)", telegram_id, user.is_admin)
         else:
             # Обновляем флаг админа, если изменился конфиг
             should_be_admin = telegram_id in (admin_ids or [])
             if user.is_admin != should_be_admin:
                 user.is_admin = should_be_admin
                 await session.commit()
+                logger.info("Обновлен флаг админа для %s -> %s", telegram_id, should_be_admin)
 
         return user
 
@@ -56,6 +62,7 @@ class UserService:
                 update(User).values(is_admin=True).where(User.telegram_id.in_(admin_ids))
             )
         await session.commit()
+        logger.info("Синхронизация админов завершена (%s)", admin_ids)
 
     @staticmethod
     async def create_withdrawal_request(
@@ -81,8 +88,10 @@ class UserService:
         session.add(request)
         await session.commit()
         await session.refresh(request)
+        logger.info("Создана заявка на вывод %s для пользователя %s", request.id, user.id)
         return request
 
+    @staticmethod
     @staticmethod
     async def get_statistics(session: AsyncSession):
         """Получить статистику по пользователям и карточкам."""
@@ -92,12 +101,10 @@ class UserService:
                 User.username,
                 User.first_name,
                 func.count(Card.id).label("total_cards"),
-                func.sum(func.case((Card.is_approved.is_(True), 1), else_=0)).label(
-                    "approved_cards"
-                ),
-                func.sum(func.case((Card.is_rejected.is_(True), 1), else_=0)).label(
-                    "rejected_cards"
-                ),
+                # Вариант 1: Используем cast
+                func.count(func.nullif(Card.is_approved, False)).label("approved_cards"),
+                # Вариант 2: Или более простой способ
+                func.sum(func.cast(Card.is_rejected, Integer)).label("rejected_cards"),
             )
             .join(Card, Card.user_id == User.id, isouter=True)
             .group_by(User.id)
