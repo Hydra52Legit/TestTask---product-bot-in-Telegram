@@ -127,9 +127,15 @@ async def process_withdraw_requisites(
     logger.info("Withdrawal request %s created for user %s", request.id, current_user.id)
 
 
-@router.message(F.text == "❌ Отмена", BalanceStates)
+@router.message(F.text == "❌ Отмена")
 async def cancel_withdraw(message: Message, state: FSMContext):
     """Отменяет сценарий вывода."""
-    await state.clear()
-    await message.answer("Действие отменено.")
+    current_state = await state.get_state()
+
+    # Проверяем что мы в состоянии вывода (опционально)
+    if current_state and current_state.startswith("BalanceStates"):
+        await state.clear()
+        await message.answer("Вывод средств отменен.")
+    else:
+        await message.answer("Нет активного процесса вывода для отмены.")
 

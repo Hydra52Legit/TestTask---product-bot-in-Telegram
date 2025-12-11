@@ -2,6 +2,7 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import Message
 from sqlalchemy import select
+from src.database.models import User
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import User
@@ -49,9 +50,19 @@ async def cmd_help(message: Message):
 
 
 @router.message(F.text == "🔙 Назад")
-async def back_to_main(message: Message, user: User):
+async def back_to_main(message: Message, session: AsyncSession):
     """Возврат в главное меню"""
+    # Получаем пользователя из БД
+    stmt = select(User).where(User.telegram_id == message.from_user.id)
+    result = await session.execute(stmt)
+    user = result.scalar_one_or_none()
+
+    if not user:
+        await message.answer("Сначала зарегистрируйтесь через /start")
+        return
+
     await message.answer(
         "Главное меню:",
         reply_markup=get_main_keyboard(user.is_admin)
     )
+
